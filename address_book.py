@@ -79,7 +79,7 @@ class Record:
         self.birthday = Birthday(day)
 
     def __str__(self):
-        return f"Contact name: {self.name.value}, phones: {'; '.join(p.value for p in self.phones)}"
+        return f"{self.name.value}, phones: {'; '.join(p.value for p in self.phones)}"
 
 
 class AddressBook(UserDict):
@@ -88,7 +88,7 @@ class AddressBook(UserDict):
         self.data[rec.name.value] = rec
 
     def find_record(self, name):
-        return self.data.get(name, "No record was found with such name")
+        return self.data.get(name)
 
     def delete_record(self, name):
         if name in self.data:
@@ -132,10 +132,16 @@ def input_error(func):
         try:
             return func(*args, **kwargs)
 
-        except KeyError:
-            return "Error: Contact not found."
         except IndexError:
             return "Error: Incorrect number of arguments."
+        except KeyError:
+            return "Error: Contact not found."
+        except ValueError as ve:
+            return f"Error: {ve}"
+        except TypeError as te:
+            return f"Error: Invalid input type. {te}"
+        except Exception as e:
+            return f"Unexpected error: {e}"
 
     return inner
 
@@ -148,7 +154,7 @@ def parse_input(user_input: str):
 @input_error
 def add_contact(args, book: AddressBook):
     name, phone, *_ = args
-    record = book.find(name)
+    record = book.find_record(name)
     message = "Contact updated."
     if record is None:
         record = Record(name)
@@ -160,38 +166,44 @@ def add_contact(args, book: AddressBook):
 
 
 @input_error
-def change_contact(args: list, contacts: dict):
-    if len(args) < 2:
+def change_contact(args: list, book: AddressBook):
+    if len(args) < 3:
         raise IndexError
 
-    name, phone = args
+    name, old_phone, new_phone = args
 
-    if name not in contacts:
-        raise KeyError
+    record = book.find_record(name)
+    if not record:
+        raise KeyError("Contact not found.")
 
-    contacts[name] = phone
-    return f"Contact {name} updated"
+    record.update_phone(old_phone, new_phone)
+    return f"Phone for {name} updated: {old_phone} > {new_phone}"
 
 
 @input_error
-def show_phone(args: list, contacts: dict):
+def show_phone(args: list, book: AddressBook):
     if not len(args) == 1:
         raise IndexError
 
     name = args[0]
+    record = book.find_record(name)
 
-    if name not in contacts:
-        raise KeyError
+    if not record:
+        raise KeyError("Contact not found")
 
-    return f"{name}: {contacts[name]}"
+    if not record.phones:
+        return f"{name} has no phone numbers."
+
+    phones = ", ".join(phone.value for phone in record.phones)
+    return f"{name}'s phone number(s): {phones}"
 
 
 @input_error
-def show_all(contacts: dict):
-    if not contacts:
+def show_all(book: AddressBook):
+    if not book:
         return "No contacts found."
 
-    return "".join(f"\n{name}: {phone}" for name, phone in contacts.items())
+    return "".join(f"\n{record}" for record in book.values())
 
 
 @input_error
